@@ -122,9 +122,9 @@
       - runinng haproxy        
 
 
-  - name: default_myhaproxy_cfg removed
+  - name: default_haproxy_cfg removed
     file:
-       path: "/etc/haproxy/myhaproxy.cfg"
+       path: "/etc/haproxy/haproxy.cfg"
        state: absent
     notify:
     - restarting Haproxy 
