@@ -1,150 +1,83 @@
 ---
 - hosts: webservers
   become: yes
-  remote_user: ubuntu
+  gather_facts: yes
+  vars:
+    root_path: /var/www/html
+    index_format: index.php
+    http_port: "80"
 
   tasks:
- 
-  - name: nginx installation
-    apt:
-      name: nginx
-      state: present
-
-  - name: php files installation      
-    apt:
-      name: php
-      state: present
-
-  - name: php-fpm installation
-    apt:
-      name: php-fpm
-      state: present
-
-  - name: packages upgrade 
-    apt:
-      update_cache: yes
-      upgrade: dist
-      force_apt_get: yes
-
-    notify:
-      - start nginx
-      - start php-fpm
-
-  - name: remove nginx.conf 
-    file:
-       path: "/etc/nginx/nginx.conf"
-       state: absent
- 
-  - name: Set nginx.conf 
-    template:
-       src: "./mynginx.conf"
-       dest: "/etc/nginx/nginx.conf"
-
-    notify:
-    - restarting php-fpm
-    - restarting nginx
-
-  - name: remove present default_file 
-    file:
-       path: "/etc/nginx/sites-enabled/default"
-       state: absent
-
-    notify:
-    - restarting nginx
-
-  - name: inserting default 
-    template:
-       src: "./default"
-       dest: "/etc/nginx/sites-available/default1"
-
-  - name: linking default 
-    file:
-       src: "/etc/nginx/sites-available/default1"
-       dest: "/etc/nginx/sites-enabled/default1"
-       state: link
-
-    notify:
-    - restarting nginx
+    - name: installing servers
+      apt:
+        name: ['nginx', 'php', 'php-fpm']
+        state: latest
+        update_cache: yes
+      when: ansible_os_family == "Debian"
+      
+    - name: Removing packages
+      apt:
+        name: apache2
+        state: absent
+        purge: yes
+        update_cache: yes
+      when: ansible_os_family == "Debian"
 
 
-  - name: inserting index.php in var
-    template:
-      src: "./index.php"
-      dest: "/var/www/html/index.php"
+    - name: template change
+      template:
+        src: default.j2
+        dest: /etc/nginx/sites-available/default
 
-    notify:
-    - restarting nginx
-    - start nginx
-    - restarting php-fpm
-    - start php-fpm
+    - name: copy index.php
+      copy:
+        src: "./{{index_format}}"
+        dest: "{{root_path}}/{{index_format}}"
+        
+    - name: HTTP on port 80 allow
+      ufw:
+        rule: allow
+        port: "{{http_port}}"
+        proto: tcp
 
-  handlers:
 
-  - name: start php-fpm
-    service:
-      name: php7.4-fpm
-      state: started
+    - name: restart server 
+      service:
+        name: nginx
+        state: restarted
 
-  - name: start nginx
-    service:
-      name: nginx
-      state: started
-
-  - name: restarting php-fpm
-    service:
-      name: php7.4-fpm
-      state: restarted
-
-  - name: restarting nginx
-    service:
-      name: nginx
-
-      state: restarted
 
 - hosts: haproxy
-  become: true
-  remote_user: ubuntu
-
+  become: yes
+  gather_facts: yes
   tasks:
+    - name: install haproxy
+      apt:
+        name: haproxy
+        update_cache: yes
+        state: latest
+      when: ansible_os_family == "Debian"
 
-  - name: haproxy installation
-    package:
-      name: "haproxy"
-      state: present
-    register: haproxystatus
+    - name: change haproxy 
+      template:
+        src: haproxy.cfg.j2
+        dest: /etc/haproxy/haproxy.cfg
 
-  - name: packages upgrade
-    apt:
-      update_cache: yes
-      upgrade: dist
-      force_apt_get: yes
-    notify:
-      - runinng haproxy        
+    - name: restart haproxy
+      service:
+        name: haproxy
+        state: restarted
 
+    - name: template of rudimentary 
+      template:
+        src:  rudimentary_test.sh.j2
+        dest: $HOME/rudimentary_test.sh
 
-  - name: default_haproxy_cfg removed
-    file:
-       path: "/etc/haproxy/haproxy.cfg"
-       state: absent
-    notify:
-    - restarting Haproxy 
+    - name: rudimentary test
+      command:  bash $HOME/rudimentary_test.sh
+      register: test
+      args:
+        warn: no
+    - debug:
+        msg:  "{{test.stdout}}"
 
-  - name: haProxy configuration
-    template:
-      src: ./myhaproxy.cfg.j2
-      dest: "/etc/haproxy/haproxy.cfg"
-    notify:
-      - restarting haproxy
-      - runinng haproxy
-
-  handlers:
-
-  - name: runinng haproxy
-    service:
-      name: haproxy
-      state: started
-
-  - name: restarting haproxy
-    service:
-      name: haproxy
-      state: restarted
