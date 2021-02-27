@@ -60,7 +60,7 @@
 
     - name: change haproxy 
       template:
-        src: haproxy.cfg.j2
+        src: myhaproxy.cfg.j2
         dest: /etc/haproxy/haproxy.cfg
 
     - name: restart haproxy
@@ -70,7 +70,7 @@
 
     - name: template of rudimentary 
       template:
-        src:  rudimentary_test.sh.j2
+        src:  ruditest.sh.j2
         dest: $HOME/rudimentary_test.sh
 
     - name: rudimentary test
